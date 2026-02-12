@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dashboard } from './components/Dashboard';
 import { TradeList } from './components/TradeList';
 import { TradeForm } from './components/TradeForm';
@@ -7,7 +7,7 @@ import { Planner } from './components/Planner';
 import { Diary } from './components/Diary';
 import { Breadcrumbs } from './components/Breadcrumbs'; // Import Breadcrumbs
 import { Trade, Task, CalendarEvent, Note } from './types';
-import { LayoutDashboard, BookOpen, Brain, Plus, Wallet, Settings, ArrowUpCircle, ArrowDownCircle, Shield, Notebook, Palette, BellRing, CalendarDays, X } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Brain, Plus, Wallet, Settings, ArrowUpCircle, ArrowDownCircle, Shield, Notebook, Palette, BellRing, CalendarDays, X, Download, Upload, FileSpreadsheet } from 'lucide-react';
 
 const CURRENCIES = [
   { code: 'USD', symbol: '$' },
@@ -56,6 +56,9 @@ const App: React.FC = () => {
 
   // Notification State
   const [notification, setNotification] = useState<{ message: string, type: 'info' | 'alert' } | null>(null);
+
+  // File Input Ref for Restore
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load from local storage on mount
   useEffect(() => {
@@ -250,6 +253,109 @@ const App: React.FC = () => {
       setIsFundsModalOpen(false);
     }
   };
+
+  // DATA EXPORT/IMPORT Handlers
+  const handleBackup = () => {
+    const data = {
+        trades,
+        tasks,
+        events,
+        notes,
+        settings: {
+            initialCapital,
+            currency,
+            dailyTradeLimit,
+            themeId
+        },
+        version: 1,
+        exportedAt: new Date().toISOString()
+    };
+    
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `trademind_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    setNotification({ message: 'Backup downloaded successfully', type: 'info' });
+  };
+
+  const handleRestore = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = JSON.parse(e.target?.result as string);
+            
+            // Basic validation
+            if (!Array.isArray(data.trades)) throw new Error("Invalid backup format");
+
+            if (window.confirm("This will overwrite your current data with the backup. Are you sure?")) {
+                setTrades(data.trades || []);
+                setTasks(data.tasks || []);
+                setEvents(data.events || []);
+                setNotes(data.notes || []);
+                
+                if (data.settings) {
+                    setInitialCapital(data.settings.initialCapital || 0);
+                    setCurrency(data.settings.currency || '$');
+                    setDailyTradeLimit(data.settings.dailyTradeLimit || 0);
+                    setThemeId(data.settings.themeId || 'slate');
+                }
+                
+                setNotification({ message: 'Data restored successfully', type: 'info' });
+                setIsSettingsModalOpen(false);
+            }
+        } catch (error) {
+            alert("Failed to restore data. Invalid file format.");
+        }
+    };
+    reader.readAsText(file);
+    // Reset input so same file can be selected again
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleExportCSV = () => {
+    // CSV Header
+    const headers = ["Date", "Symbol", "Type", "Outcome", "Entry Price", "Exit Price", "Quantity", "PnL", "Setup", "Mistakes", "Learnings", "Notes"];
+    
+    // Map trades to rows
+    const rows = trades.map(t => [
+        `"${new Date(t.date).toLocaleDateString()}"`,
+        `"${t.symbol}"`,
+        t.type,
+        t.outcome,
+        t.entryPrice,
+        t.exitPrice || '',
+        t.quantity,
+        t.pnl || '',
+        `"${(t.setup || '').replace(/"/g, '""')}"`, // Escape quotes
+        `"${(t.mistakes || '').replace(/"/g, '""')}"`,
+        `"${(t.learnings || '').replace(/"/g, '""')}"`,
+        `"${(t.notes || '').replace(/"/g, '""')}"`
+    ].join(","));
+
+    const csvContent = [headers.join(","), ...rows].join("\n");
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `trademind_trades_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    setNotification({ message: 'Excel (CSV) export downloaded', type: 'info' });
+  };
+
 
   // Logic for Trade Limit
   const todayTradeCount = trades.filter(t => 
@@ -575,7 +681,7 @@ const App: React.FC = () => {
       {/* Settings Modal */}
       {isSettingsModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-             <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl p-6">
+             <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
                  <div className="flex justify-between items-center mb-6">
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
                         <Settings className="w-5 h-5 text-blue-500" /> Settings
@@ -583,61 +689,124 @@ const App: React.FC = () => {
                     <button onClick={() => setIsSettingsModalOpen(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
                  </div>
                  
-                 <div className="space-y-6">
-                    <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <label className="text-sm font-medium text-slate-300">Daily Trade Limit</label>
-                            <span className="text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded">0 = Unlimited</span>
+                 <div className="space-y-8">
+                    {/* General Settings */}
+                    <div className="space-y-4">
+                        <h4 className="text-sm font-bold text-slate-400 uppercase border-b border-slate-700 pb-2">General</h4>
+                        <div>
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="text-sm font-medium text-slate-300">Daily Trade Limit</label>
+                                <span className="text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded">0 = Unlimited</span>
+                            </div>
+                            <input 
+                                type="number" 
+                                value={dailyTradeLimit}
+                                onChange={(e) => setDailyTradeLimit(parseInt(e.target.value) || 0)}
+                                className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none"
+                            />
+                            <p className="text-xs text-slate-500 mt-2">
+                                Set a hard limit on the number of trades you can take per day. We will warn you if you try to exceed this.
+                            </p>
                         </div>
-                        <input 
-                            type="number" 
-                            value={dailyTradeLimit}
-                            onChange={(e) => setDailyTradeLimit(parseInt(e.target.value) || 0)}
-                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none"
-                        />
-                        <p className="text-xs text-slate-500 mt-2">
-                            Set a hard limit on the number of trades you can take per day. We will warn you if you try to exceed this.
-                        </p>
+
+                        <div>
+                            <label className="text-sm font-medium text-slate-300 mb-2 block">Account Currency</label>
+                            <div className="grid grid-cols-4 gap-2">
+                                {CURRENCIES.map(c => (
+                                    <button
+                                        key={c.code}
+                                        onClick={() => setCurrency(c.symbol)}
+                                        className={`p-2 rounded border text-sm font-medium ${
+                                            currency === c.symbol 
+                                            ? 'bg-blue-600 border-blue-600 text-white' 
+                                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                                        }`}
+                                    >
+                                        {c.code}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                                <Palette className="w-4 h-4 text-purple-400" /> Appearance
+                            </label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {THEMES.map(t => (
+                                    <button
+                                        key={t.id}
+                                        onClick={() => setThemeId(t.id)}
+                                        className={`p-2 rounded border text-sm font-medium flex items-center gap-2 ${
+                                            themeId === t.id 
+                                            ? 'bg-blue-600/20 border-blue-600 text-white' 
+                                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                                        }`}
+                                    >
+                                        <div className={`w-4 h-4 rounded-full border border-white/20 ${t.bgClass}`}></div>
+                                        {t.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
-                    <div>
-                        <label className="text-sm font-medium text-slate-300 mb-2 block">Account Currency</label>
-                        <div className="grid grid-cols-4 gap-2">
-                            {CURRENCIES.map(c => (
-                                <button
-                                    key={c.code}
-                                    onClick={() => setCurrency(c.symbol)}
-                                    className={`p-2 rounded border text-sm font-medium ${
-                                        currency === c.symbol 
-                                        ? 'bg-blue-600 border-blue-600 text-white' 
-                                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
-                                    }`}
-                                >
-                                    {c.code}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <label className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
-                            <Palette className="w-4 h-4 text-purple-400" /> Appearance
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                             {THEMES.map(t => (
-                                 <button
-                                     key={t.id}
-                                     onClick={() => setThemeId(t.id)}
-                                     className={`p-2 rounded border text-sm font-medium flex items-center gap-2 ${
-                                         themeId === t.id 
-                                         ? 'bg-blue-600/20 border-blue-600 text-white' 
-                                         : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
-                                     }`}
-                                 >
-                                     <div className={`w-4 h-4 rounded-full border border-white/20 ${t.bgClass}`}></div>
-                                     {t.name}
-                                 </button>
-                             ))}
+                    {/* Data Management */}
+                    <div className="space-y-4">
+                        <h4 className="text-sm font-bold text-slate-400 uppercase border-b border-slate-700 pb-2">Data Management</h4>
+                        
+                        <div className="grid grid-cols-1 gap-3">
+                            <button 
+                                onClick={handleBackup}
+                                className="flex items-center justify-between p-3 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                                        <Download className="w-5 h-5" />
+                                    </div>
+                                    <div className="text-left">
+                                        <div className="text-sm font-medium text-slate-200">Backup Data</div>
+                                        <div className="text-xs text-slate-500">Download a full JSON backup of your journal.</div>
+                                    </div>
+                                </div>
+                            </button>
+
+                            <button 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex items-center justify-between p-3 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                                        <Upload className="w-5 h-5" />
+                                    </div>
+                                    <div className="text-left">
+                                        <div className="text-sm font-medium text-slate-200">Restore Data</div>
+                                        <div className="text-xs text-slate-500">Restore from a previously saved JSON file.</div>
+                                    </div>
+                                </div>
+                            </button>
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                onChange={handleRestore} 
+                                className="hidden" 
+                                accept="application/json"
+                            />
+
+                            <button 
+                                onClick={handleExportCSV}
+                                className="flex items-center justify-between p-3 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-green-500/10 rounded-lg text-green-400 group-hover:bg-green-600 group-hover:text-white transition-colors">
+                                        <FileSpreadsheet className="w-5 h-5" />
+                                    </div>
+                                    <div className="text-left">
+                                        <div className="text-sm font-medium text-slate-200">Export to Excel</div>
+                                        <div className="text-xs text-slate-500">Download trade history as a CSV file.</div>
+                                    </div>
+                                </div>
+                            </button>
                         </div>
                     </div>
 
