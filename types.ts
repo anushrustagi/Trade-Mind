@@ -90,9 +90,3 @@ export interface Note {
   date: string; // ISO String
   lastModified: string; // ISO String
 }
-
-export interface NewsItem {
-  title: string;
-  url: string;
-  source: string;
-}

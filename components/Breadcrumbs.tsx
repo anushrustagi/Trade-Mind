@@ -9,7 +9,7 @@ const TAB_NAMES: Record<string, string> = {
   dashboard: 'Dashboard',
   journal: 'Journal',
   planner: 'Planner',
-  coach: 'AI Coach',
+  coach: 'Analytics',
   diary: 'Diary'
 };
 

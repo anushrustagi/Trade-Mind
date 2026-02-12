@@ -5,7 +5,6 @@ import {
   BarChart, Bar, Cell, PieChart, Pie, Legend, StackedBarChart
 } from 'recharts';
 import { TrendingUp, TrendingDown, Activity, DollarSign, Wallet, Brain } from 'lucide-react';
-import { NewsWidget } from './NewsWidget';
 
 interface DashboardProps {
   trades: Trade[];
@@ -282,7 +281,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ trades, initialCapital, cu
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
           {/* Daily Performance Chart */}
           <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
              <h3 className="text-lg font-semibold text-slate-100 mb-6">Daily Performance Rates</h3>
@@ -311,9 +310,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ trades, initialCapital, cu
                 )}
              </div>
           </div>
-
-          {/* News Widget */}
-          <NewsWidget />
       </div>
 
       {/* Psychology Section */}

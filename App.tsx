@@ -328,7 +328,7 @@ const App: React.FC = () => {
             }`}
           >
             <Brain className="w-4 h-4" />
-            <span className="hidden sm:inline">Coach</span>
+            <span className="hidden sm:inline">Analytics</span>
           </button>
         </nav>
 
@@ -466,7 +466,7 @@ const App: React.FC = () => {
         {activeTab === 'coach' && (
           <div className="animate-in fade-in duration-500 grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-140px)]">
             <div className="lg:col-span-2 h-full">
-               <AICoach trades={trades} currency={currency} />
+               <AICoach trades={trades} currency={currency} initialCapital={initialCapital} />
             </div>
             <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 h-fit">
               <h3 className="font-bold text-white mb-4">Psychology Tips</h3>
