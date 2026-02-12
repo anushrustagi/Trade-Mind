@@ -30,6 +30,7 @@ export const Planner: React.FC<PlannerProps> = ({
   // Event Input State
   const [newEventTitle, setNewEventTitle] = useState('');
   const [newEventDate, setNewEventDate] = useState('');
+  const [newEventTime, setNewEventTime] = useState('');
   const [newEventImpact, setNewEventImpact] = useState<'HIGH' | 'MEDIUM' | 'LOW'>('HIGH');
 
   // Filtered Data
@@ -43,7 +44,12 @@ export const Planner: React.FC<PlannerProps> = ({
     const today = new Date().toISOString().slice(0, 10);
     return events
       .filter(e => e.date >= today)
-      .sort((a, b) => a.date.localeCompare(b.date));
+      .sort((a, b) => {
+        if (a.date === b.date) {
+            return (a.time || '00:00').localeCompare(b.time || '00:00');
+        }
+        return a.date.localeCompare(b.date);
+      });
   }, [events]);
 
   // Handlers
@@ -56,7 +62,8 @@ export const Planner: React.FC<PlannerProps> = ({
       text: newTaskText,
       completed: false,
       date: selectedDate,
-      time: newTaskTime || undefined
+      time: newTaskTime || undefined,
+      notified: false
     });
     setNewTaskText('');
     setNewTaskTime('');
@@ -83,7 +90,8 @@ export const Planner: React.FC<PlannerProps> = ({
         onUpdateTask({
             ...original,
             text: editingText,
-            time: editingTime || undefined
+            time: editingTime || undefined,
+            notified: editingTime !== original.time ? false : original.notified // Reset notification if time changed
         });
     }
     cancelEditing();
@@ -97,10 +105,13 @@ export const Planner: React.FC<PlannerProps> = ({
       id: crypto.randomUUID(),
       title: newEventTitle,
       date: newEventDate,
-      impact: newEventImpact
+      time: newEventTime || undefined,
+      impact: newEventImpact,
+      notified: false
     });
     setNewEventTitle('');
     setNewEventDate('');
+    setNewEventTime('');
   };
 
   const changeDate = (days: number) => {
@@ -198,9 +209,10 @@ export const Planner: React.FC<PlannerProps> = ({
                     </div>
 
                     {task.time && (
-                      <div className="flex items-center gap-1 text-xs text-blue-400 bg-blue-900/20 px-2 py-1 rounded">
+                      <div className={`flex items-center gap-1 text-xs px-2 py-1 rounded ${task.notified ? 'bg-slate-800 text-slate-500' : 'bg-blue-900/20 text-blue-400'}`}>
                         <Clock className="w-3 h-3" />
                         {task.time}
+                        {task.notified && <Bell className="w-3 h-3 ml-1" />}
                       </div>
                     )}
 
@@ -234,7 +246,7 @@ export const Planner: React.FC<PlannerProps> = ({
                 type="text" 
                 value={newTaskText}
                 onChange={(e) => setNewTaskText(e.target.value)}
-                placeholder="Add a trading task..."
+                placeholder="Add a trading task (set time for reminder)..."
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-blue-500"
               />
               <div className="flex items-center gap-2">
@@ -291,8 +303,8 @@ export const Planner: React.FC<PlannerProps> = ({
                            </span>
                         </div>
                         {event.time && (
-                           <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                              <Bell className="w-3 h-3" /> {event.time}
+                           <div className={`text-xs mt-1 flex items-center gap-1 ${event.notified ? 'text-slate-500' : 'text-slate-400'}`}>
+                              <Bell className={`w-3 h-3 ${event.notified ? 'text-slate-600' : 'text-slate-400'}`} /> {event.time}
                            </div>
                         )}
                      </div>
@@ -321,6 +333,12 @@ export const Planner: React.FC<PlannerProps> = ({
                      value={newEventDate}
                      onChange={(e) => setNewEventDate(e.target.value)}
                      className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-300 outline-none flex-1"
+                  />
+                  <input 
+                     type="time"
+                     value={newEventTime}
+                     onChange={(e) => setNewEventTime(e.target.value)}
+                     className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-300 outline-none w-24"
                   />
                   <select 
                      value={newEventImpact}

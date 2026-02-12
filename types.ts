@@ -1,3 +1,4 @@
+
 export enum TradeType {
   LONG = 'LONG',
   SHORT = 'SHORT'
@@ -70,6 +71,7 @@ export interface Task {
   completed: boolean;
   date: string; // YYYY-MM-DD
   time?: string; // HH:MM for reminders
+  notified?: boolean;
 }
 
 export interface CalendarEvent {
@@ -78,4 +80,19 @@ export interface CalendarEvent {
   date: string; // YYYY-MM-DD
   time?: string;
   impact: 'HIGH' | 'MEDIUM' | 'LOW';
+  notified?: boolean;
+}
+
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  date: string; // ISO String
+  lastModified: string; // ISO String
+}
+
+export interface NewsItem {
+  title: string;
+  url: string;
+  source: string;
 }

@@ -3,9 +3,11 @@ import { Dashboard } from './components/Dashboard';
 import { TradeList } from './components/TradeList';
 import { TradeForm } from './components/TradeForm';
 import { AICoach } from './components/AICoach';
-import { Planner } from './components/Planner'; // Import Planner
-import { Trade, Task, CalendarEvent } from './types';
-import { LayoutDashboard, BookOpen, Brain, Plus, Wallet, Check, Edit2, CalendarDays, Settings, ArrowUpCircle, ArrowDownCircle, Shield } from 'lucide-react';
+import { Planner } from './components/Planner';
+import { Diary } from './components/Diary';
+import { Breadcrumbs } from './components/Breadcrumbs'; // Import Breadcrumbs
+import { Trade, Task, CalendarEvent, Note } from './types';
+import { LayoutDashboard, BookOpen, Brain, Plus, Wallet, Settings, ArrowUpCircle, ArrowDownCircle, Shield, Notebook, Palette, BellRing, CalendarDays, X } from 'lucide-react';
 
 const CURRENCIES = [
   { code: 'USD', symbol: '$' },
@@ -19,12 +21,22 @@ const CURRENCIES = [
   { code: 'ETH', symbol: 'Ξ' },
 ];
 
+const THEMES = [
+  { id: 'slate', name: 'Cosmic Slate', bgClass: 'bg-slate-900', headerClass: 'bg-slate-900/80 border-b border-slate-800', textMain: 'text-white', textMuted: 'text-slate-400' },
+  { id: 'zinc', name: 'Void Black', bgClass: 'bg-zinc-950', headerClass: 'bg-zinc-950/80 border-b border-zinc-900', textMain: 'text-white', textMuted: 'text-zinc-400' },
+  { id: 'neutral', name: 'Studio Grey', bgClass: 'bg-neutral-900', headerClass: 'bg-neutral-900/80 border-b border-neutral-800', textMain: 'text-white', textMuted: 'text-neutral-400' },
+  { id: 'blue', name: 'Midnight', bgClass: 'bg-blue-950', headerClass: 'bg-blue-950/80 border-b border-blue-900', textMain: 'text-white', textMuted: 'text-blue-300' },
+  { id: 'indigo', name: 'Deep Indigo', bgClass: 'bg-indigo-950', headerClass: 'bg-indigo-950/80 border-b border-indigo-900', textMain: 'text-white', textMuted: 'text-indigo-300' },
+  { id: 'white', name: 'Polar White', bgClass: 'bg-slate-50', headerClass: 'bg-white/80 border-b border-slate-200', textMain: 'text-slate-900', textMuted: 'text-slate-500' },
+];
+
 const App: React.FC = () => {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]); // Notes State
   
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'journal' | 'planner' | 'coach'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'journal' | 'planner' | 'coach' | 'diary'>('dashboard');
   
   // State for Form Modal
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -38,6 +50,12 @@ const App: React.FC = () => {
   const [isFundsModalOpen, setIsFundsModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [transactionAmount, setTransactionAmount] = useState('');
+  
+  // Theme State
+  const [themeId, setThemeId] = useState<string>('slate');
+
+  // Notification State
+  const [notification, setNotification] = useState<{ message: string, type: 'info' | 'alert' } | null>(null);
 
   // Load from local storage on mount
   useEffect(() => {
@@ -60,6 +78,11 @@ const App: React.FC = () => {
        try { setEvents(JSON.parse(savedEvents)); } catch (e) {}
     }
 
+    const savedNotes = localStorage.getItem('tradeMind_notes');
+    if (savedNotes) {
+       try { setNotes(JSON.parse(savedNotes)); } catch (e) {}
+    }
+
     const savedCapital = localStorage.getItem('tradeMind_capital');
     if (savedCapital) {
       setInitialCapital(parseFloat(savedCapital));
@@ -73,6 +96,11 @@ const App: React.FC = () => {
     const savedLimit = localStorage.getItem('tradeMind_dailyLimit');
     if (savedLimit) {
       setDailyTradeLimit(parseInt(savedLimit, 10));
+    }
+
+    const savedTheme = localStorage.getItem('tradeMind_theme');
+    if (savedTheme) {
+      setThemeId(savedTheme);
     }
   }, []);
 
@@ -90,6 +118,10 @@ const App: React.FC = () => {
   }, [events]);
 
   useEffect(() => {
+    localStorage.setItem('tradeMind_notes', JSON.stringify(notes));
+  }, [notes]);
+
+  useEffect(() => {
     localStorage.setItem('tradeMind_capital', initialCapital.toString());
   }, [initialCapital]);
 
@@ -100,6 +132,54 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('tradeMind_dailyLimit', dailyTradeLimit.toString());
   }, [dailyTradeLimit]);
+
+  useEffect(() => {
+    localStorage.setItem('tradeMind_theme', themeId);
+  }, [themeId]);
+
+  // --- REMINDER SYSTEM ---
+  useEffect(() => {
+    const checkReminders = () => {
+        const now = new Date();
+        const currentDate = now.toISOString().slice(0, 10);
+        const currentTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+        // Check Tasks
+        let updatedTasks = false;
+        const newTasks = tasks.map(task => {
+            if (!task.completed && !task.notified && task.date === currentDate && task.time === currentTime) {
+                setNotification({ message: `Reminder: ${task.text}`, type: 'info' });
+                updatedTasks = true;
+                return { ...task, notified: true };
+            }
+            return task;
+        });
+        if (updatedTasks) setTasks(newTasks);
+
+        // Check Events
+        let updatedEvents = false;
+        const newEvents = events.map(event => {
+            if (!event.notified && event.date === currentDate && event.time === currentTime) {
+                setNotification({ message: `Event Alert: ${event.title}`, type: 'alert' });
+                updatedEvents = true;
+                return { ...event, notified: true };
+            }
+            return event;
+        });
+        if (updatedEvents) setEvents(newEvents);
+    };
+
+    const interval = setInterval(checkReminders, 10000); // Check every 10 seconds
+    return () => clearInterval(interval);
+  }, [tasks, events]);
+
+  // Clear notification after 5 seconds
+  useEffect(() => {
+      if (notification) {
+          const timer = setTimeout(() => setNotification(null), 5000);
+          return () => clearTimeout(timer);
+      }
+  }, [notification]);
 
   // Trade Handlers
   const handleSaveTrade = (trade: Trade) => {
@@ -136,6 +216,21 @@ const App: React.FC = () => {
   
   const handleAddEvent = (event: CalendarEvent) => setEvents(prev => [...prev, event]);
   const handleDeleteEvent = (id: string) => setEvents(prev => prev.filter(e => e.id !== id));
+
+  // Diary Handlers
+  const handleSaveNote = (note: Note) => {
+    setNotes(prev => {
+        const exists = prev.find(n => n.id === note.id);
+        if (exists) {
+            return prev.map(n => n.id === note.id ? note : n);
+        }
+        return [note, ...prev];
+    });
+  };
+
+  const handleDeleteNote = (id: string) => {
+    setNotes(prev => prev.filter(n => n.id !== id));
+  };
 
   // Funds Handlers
   const handleDeposit = () => {
@@ -176,21 +271,23 @@ const App: React.FC = () => {
     setIsFormOpen(false);
   };
 
+  const currentTheme = THEMES.find(t => t.id === themeId) || THEMES[0];
+
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-purple-500/30">
+    <div className={`min-h-screen ${currentTheme.bgClass} font-sans selection:bg-purple-500/30 transition-colors duration-500`}>
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 h-16 bg-slate-900/80 backdrop-blur-md border-b border-slate-800 flex items-center justify-between px-4 md:px-8 z-40">
+      <header className={`fixed top-0 left-0 right-0 h-16 ${currentTheme.headerClass} backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-40 transition-colors duration-500`}>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
             <span className="font-bold text-white">TM</span>
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-white hidden md:block">TradeMind</h1>
+          <h1 className={`text-xl font-bold tracking-tight ${currentTheme.textMain} hidden md:block`}>TradeMind</h1>
         </div>
 
-        <nav className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
+        <nav className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700 overflow-x-auto max-w-[calc(100vw-180px)] sm:max-w-none no-scrollbar">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+            className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'dashboard' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -199,7 +296,7 @@ const App: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('journal')}
-            className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+            className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'journal' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -207,8 +304,17 @@ const App: React.FC = () => {
             <span className="hidden sm:inline">Journal</span>
           </button>
           <button
+            onClick={() => setActiveTab('diary')}
+            className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'diary' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Notebook className="w-4 h-4" />
+            <span className="hidden sm:inline">Diary</span>
+          </button>
+          <button
             onClick={() => setActiveTab('planner')}
-            className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+            className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'planner' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -217,7 +323,7 @@ const App: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('coach')}
-            className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 ${
+            className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'coach' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -227,10 +333,18 @@ const App: React.FC = () => {
         </nav>
 
         <div className="flex items-center gap-3">
+          {/* Limit Reached Indicator */}
+          {dailyTradeLimit > 0 && todayTradeCount >= dailyTradeLimit && (
+            <div className="hidden md:flex items-center gap-1 bg-red-500/10 border border-red-500/50 text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold animate-pulse">
+                <Shield className="w-3 h-3" />
+                <span>Limit Reached</span>
+            </div>
+          )}
+
           {/* Capital Widget */}
           <button 
              onClick={() => setIsFundsModalOpen(true)}
-             className="hidden sm:flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-700 transition-colors"
+             className="hidden lg:flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-700 transition-colors"
           >
             <Wallet className="w-4 h-4 text-emerald-500" />
             <span className="text-sm font-medium text-slate-200">
@@ -241,8 +355,8 @@ const App: React.FC = () => {
           {/* Settings Widget */}
           <button 
              onClick={() => setIsSettingsModalOpen(true)}
-             className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors relative"
-             title="Risk Settings"
+             className={`p-2 hover:bg-slate-800 rounded-lg transition-colors relative ${currentTheme.id === 'white' ? 'text-slate-500 hover:text-white' : 'text-slate-400 hover:text-white'}`}
+             title="Settings"
           >
             <Settings className="w-5 h-5" />
             {dailyTradeLimit > 0 && todayTradeCount >= dailyTradeLimit && (
@@ -265,13 +379,15 @@ const App: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="pt-24 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
+      <main className="pt-20 pb-12 px-4 md:px-8 max-w-7xl mx-auto">
+        <Breadcrumbs activeTab={activeTab} />
+        
         {activeTab === 'dashboard' && (
           <div className="animate-in fade-in duration-500">
              <div className="mb-8 flex justify-between items-end">
                <div>
-                 <h2 className="text-2xl font-bold text-white mb-2">Trading Performance</h2>
-                 <p className="text-slate-400">Track your progress and equity curve.</p>
+                 <h2 className={`text-2xl font-bold mb-2 ${currentTheme.textMain}`}>Trading Performance</h2>
+                 <p className={currentTheme.textMuted}>Track your progress and equity curve.</p>
                </div>
                {dailyTradeLimit > 0 && (
                  <div className="bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 flex flex-col items-end">
@@ -284,7 +400,7 @@ const App: React.FC = () => {
              </div>
              <Dashboard trades={trades} initialCapital={initialCapital} currency={currency} />
              <div className="mt-8">
-                <h3 className="text-lg font-bold text-white mb-4">Recent Activity</h3>
+                <h3 className={`text-lg font-bold mb-4 ${currentTheme.textMain}`}>Recent Activity</h3>
                 <TradeList 
                   trades={trades.slice(0, 5)} 
                   initialCapital={initialCapital}
@@ -300,8 +416,8 @@ const App: React.FC = () => {
           <div className="animate-in fade-in duration-500">
              <div className="mb-8 flex justify-between items-end">
                <div>
-                 <h2 className="text-2xl font-bold text-white mb-2">Trade Journal</h2>
-                 <p className="text-slate-400">Detailed history of all your executions.</p>
+                 <h2 className={`text-2xl font-bold mb-2 ${currentTheme.textMain}`}>Trade Journal</h2>
+                 <p className={currentTheme.textMuted}>Detailed history of all your executions.</p>
                </div>
              </div>
              <TradeList 
@@ -314,11 +430,25 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {activeTab === 'diary' && (
+           <div className="animate-in fade-in duration-500">
+              <div className="mb-6">
+                <h2 className={`text-2xl font-bold mb-2 ${currentTheme.textMain}`}>Trader's Diary</h2>
+                <p className={currentTheme.textMuted}>Record your daily thoughts, psychological state, and market observations.</p>
+              </div>
+              <Diary 
+                 notes={notes}
+                 onSave={handleSaveNote}
+                 onDelete={handleDeleteNote}
+              />
+           </div>
+        )}
+
         {activeTab === 'planner' && (
           <div className="animate-in fade-in duration-500 h-[calc(100vh-140px)]">
              <div className="mb-6">
-               <h2 className="text-2xl font-bold text-white mb-2">Day Planner & Events</h2>
-               <p className="text-slate-400">Structure your trading day and stay ahead of market events.</p>
+               <h2 className={`text-2xl font-bold mb-2 ${currentTheme.textMain}`}>Day Planner & Events</h2>
+               <p className={currentTheme.textMuted}>Structure your trading day and stay ahead of market events.</p>
              </div>
              <Planner 
                 tasks={tasks}
@@ -370,6 +500,19 @@ const App: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Notification Toast */}
+      {notification && (
+          <div className={`fixed bottom-8 right-8 z-50 px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-right duration-300 ${
+              notification.type === 'alert' ? 'bg-red-900/90 border border-red-500/50 text-white' : 'bg-blue-600/90 border border-blue-400/50 text-white'
+          }`}>
+              <BellRing className="w-6 h-6 animate-pulse" />
+              <div>
+                  <h4 className="font-bold text-sm uppercase tracking-wider">{notification.type === 'alert' ? 'Alert' : 'Reminder'}</h4>
+                  <p className="text-sm font-medium">{notification.message}</p>
+              </div>
+          </div>
+      )}
 
       {isFormOpen && (
         <TradeForm 
@@ -429,13 +572,13 @@ const App: React.FC = () => {
           </div>
       )}
 
-      {/* Risk Settings Modal */}
+      {/* Settings Modal */}
       {isSettingsModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
              <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl p-6">
                  <div className="flex justify-between items-center mb-6">
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                        <Settings className="w-5 h-5 text-blue-500" /> Risk Controls
+                        <Settings className="w-5 h-5 text-blue-500" /> Settings
                     </h3>
                     <button onClick={() => setIsSettingsModalOpen(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
                  </div>
@@ -476,11 +619,33 @@ const App: React.FC = () => {
                         </div>
                     </div>
                     
+                    <div>
+                        <label className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                            <Palette className="w-4 h-4 text-purple-400" /> Appearance
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                             {THEMES.map(t => (
+                                 <button
+                                     key={t.id}
+                                     onClick={() => setThemeId(t.id)}
+                                     className={`p-2 rounded border text-sm font-medium flex items-center gap-2 ${
+                                         themeId === t.id 
+                                         ? 'bg-blue-600/20 border-blue-600 text-white' 
+                                         : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                                     }`}
+                                 >
+                                     <div className={`w-4 h-4 rounded-full border border-white/20 ${t.bgClass}`}></div>
+                                     {t.name}
+                                 </button>
+                             ))}
+                        </div>
+                    </div>
+
                     <button 
                         onClick={() => setIsSettingsModalOpen(false)}
                         className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-medium transition-colors"
                     >
-                        Save Settings
+                        Close Settings
                     </button>
                  </div>
              </div>
@@ -489,10 +654,5 @@ const App: React.FC = () => {
     </div>
   );
 };
-
-// Simple helper icon
-const X = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-);
 
 export default App;

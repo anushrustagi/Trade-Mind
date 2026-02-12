@@ -2,9 +2,10 @@ import React, { useMemo } from 'react';
 import { Trade, Outcome, TradeType } from '../types';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  BarChart, Bar, Cell, PieChart, Pie, Legend
+  BarChart, Bar, Cell, PieChart, Pie, Legend, StackedBarChart
 } from 'recharts';
 import { TrendingUp, TrendingDown, Activity, DollarSign, Wallet, Brain } from 'lucide-react';
+import { NewsWidget } from './NewsWidget';
 
 interface DashboardProps {
   trades: Trade[];
@@ -70,6 +71,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ trades, initialCapital, cu
 
     return data;
   }, [trades, initialCapital]);
+
+  const dailyPerformanceData = useMemo(() => {
+     // Group trades by date
+     const grouped: Record<string, { win: number, loss: number, be: number, total: number }> = {};
+     
+     const closedTrades = trades
+        .filter(t => t.outcome !== Outcome.OPEN)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+     closedTrades.forEach(t => {
+         const dateKey = new Date(t.date).toLocaleDateString();
+         if (!grouped[dateKey]) grouped[dateKey] = { win: 0, loss: 0, be: 0, total: 0 };
+         
+         grouped[dateKey].total += 1;
+         if (t.outcome === Outcome.WIN) grouped[dateKey].win += 1;
+         else if (t.outcome === Outcome.LOSS) grouped[dateKey].loss += 1;
+         else if (t.outcome === Outcome.BREAK_EVEN) grouped[dateKey].be += 1;
+     });
+
+     return Object.entries(grouped).map(([date, counts]) => ({
+         date,
+         winRate: (counts.win / counts.total) * 100,
+         lossRate: (counts.loss / counts.total) * 100,
+         beRate: (counts.be / counts.total) * 100,
+         total: counts.total
+     })).slice(-10); // Last 10 days
+  }, [trades]);
 
   const emotionStats = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -197,7 +225,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ trades, initialCapital, cu
         </div>
       </div>
 
-      {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Equity Curve */}
         <div className="lg:col-span-2 bg-slate-800 p-6 rounded-xl border border-slate-700">
@@ -253,6 +280,40 @@ export const Dashboard: React.FC<DashboardProps> = ({ trades, initialCapital, cu
             </ResponsiveContainer>
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Daily Performance Chart */}
+          <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
+             <h3 className="text-lg font-semibold text-slate-100 mb-6">Daily Performance Rates</h3>
+             <div className="h-64">
+                {dailyPerformanceData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={dailyPerformanceData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                            <XAxis dataKey="date" stroke="#94a3b8" tick={{fontSize: 10}} />
+                            <YAxis stroke="#94a3b8" tick={{fontSize: 12}} unit="%" />
+                            <RechartsTooltip 
+                                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#475569', color: '#f1f5f9' }}
+                                cursor={{fill: '#334155', opacity: 0.4}}
+                            />
+                            <Legend />
+                            <Bar dataKey="winRate" name="Win %" stackId="a" fill="#10b981" />
+                            <Bar dataKey="lossRate" name="Loss %" stackId="a" fill="#ef4444" />
+                            <Bar dataKey="beRate" name="BE %" stackId="a" fill="#64748b" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-500">
+                        <Activity className="w-8 h-8 mb-2 opacity-50" />
+                        <p>No enough trade data.</p>
+                    </div>
+                )}
+             </div>
+          </div>
+
+          {/* News Widget */}
+          <NewsWidget />
       </div>
 
       {/* Psychology Section */}
