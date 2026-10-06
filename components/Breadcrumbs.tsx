@@ -10,7 +10,8 @@ const TAB_NAMES: Record<string, string> = {
   journal: 'Journal',
   planner: 'Planner',
   coach: 'Analytics',
-  diary: 'Diary'
+  diary: 'Diary',
+  gallery: 'Gallery'
 };
 
 export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ activeTab }) => {

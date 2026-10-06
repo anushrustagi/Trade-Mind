@@ -56,6 +56,12 @@ export interface Trade {
   screenshotUrl?: string;
 }
 
+export interface Account {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
 export interface DailyStats {
   date: string;
   totalTrades: number;

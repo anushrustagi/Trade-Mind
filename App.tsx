@@ -5,9 +5,10 @@ import { TradeForm } from './components/TradeForm';
 import { AICoach } from './components/AICoach';
 import { Planner } from './components/Planner';
 import { Diary } from './components/Diary';
+import { ScreenshotGallery } from './components/ScreenshotGallery';
 import { Breadcrumbs } from './components/Breadcrumbs'; // Import Breadcrumbs
-import { Trade, Task, CalendarEvent, Note } from './types';
-import { LayoutDashboard, BookOpen, Brain, Plus, Wallet, Settings, ArrowUpCircle, ArrowDownCircle, Shield, Notebook, Palette, BellRing, CalendarDays, X, Download, Upload, FileSpreadsheet } from 'lucide-react';
+import { Trade, Task, CalendarEvent, Note, Account } from './types';
+import { LayoutDashboard, BookOpen, Brain, Plus, Wallet, Settings, ArrowUpCircle, ArrowDownCircle, Shield, Notebook, Palette, BellRing, CalendarDays, X, Download, Upload, FileSpreadsheet, Users, UserPlus, RotateCcw, Image as ImageIcon } from 'lucide-react';
 
 const CURRENCIES = [
   { code: 'USD', symbol: '$' },
@@ -36,7 +37,13 @@ const App: React.FC = () => {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [notes, setNotes] = useState<Note[]>([]); // Notes State
   
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'journal' | 'planner' | 'coach' | 'diary'>('dashboard');
+  // Account Management State
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [currentAccountId, setCurrentAccountId] = useState<string>('default');
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [newAccountName, setNewAccountName] = useState('');
+
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'journal' | 'planner' | 'coach' | 'diary' | 'gallery'>('dashboard');
   
   // State for Form Modal
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -60,85 +67,128 @@ const App: React.FC = () => {
   // File Input Ref for Restore
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load from local storage on mount
+  // Load accounts and current account ID on mount
   useEffect(() => {
-    const savedTrades = localStorage.getItem('tradeMind_trades');
-    if (savedTrades) {
+    const savedAccounts = localStorage.getItem('tradeMind_accounts_list');
+    if (savedAccounts) {
       try {
-        setTrades(JSON.parse(savedTrades));
+        const parsed = JSON.parse(savedAccounts);
+        setAccounts(parsed);
+        if (parsed.length > 0) {
+          const lastUsedId = localStorage.getItem('tradeMind_last_account_id');
+          if (lastUsedId && parsed.find((a: Account) => a.id === lastUsedId)) {
+            setCurrentAccountId(lastUsedId);
+          } else {
+            setCurrentAccountId(parsed[0].id);
+          }
+        }
       } catch (e) {
-        console.error("Failed to parse trades", e);
+        console.error("Failed to parse accounts", e);
       }
-    }
-
-    const savedTasks = localStorage.getItem('tradeMind_tasks');
-    if (savedTasks) {
-       try { setTasks(JSON.parse(savedTasks)); } catch (e) {}
-    }
-
-    const savedEvents = localStorage.getItem('tradeMind_events');
-    if (savedEvents) {
-       try { setEvents(JSON.parse(savedEvents)); } catch (e) {}
-    }
-
-    const savedNotes = localStorage.getItem('tradeMind_notes');
-    if (savedNotes) {
-       try { setNotes(JSON.parse(savedNotes)); } catch (e) {}
-    }
-
-    const savedCapital = localStorage.getItem('tradeMind_capital');
-    if (savedCapital) {
-      setInitialCapital(parseFloat(savedCapital));
-    }
-
-    const savedCurrency = localStorage.getItem('tradeMind_currency');
-    if (savedCurrency) {
-      setCurrency(savedCurrency);
-    }
-    
-    const savedLimit = localStorage.getItem('tradeMind_dailyLimit');
-    if (savedLimit) {
-      setDailyTradeLimit(parseInt(savedLimit, 10));
-    }
-
-    const savedTheme = localStorage.getItem('tradeMind_theme');
-    if (savedTheme) {
-      setThemeId(savedTheme);
+    } else {
+      // Initialize with a default account if none exist
+      const defaultAccount: Account = { id: 'default', name: 'Primary Account', createdAt: new Date().toISOString() };
+      setAccounts([defaultAccount]);
+      localStorage.setItem('tradeMind_accounts_list', JSON.stringify([defaultAccount]));
+      setCurrentAccountId('default');
     }
   }, []);
 
+  // Load from local storage on account change
+  useEffect(() => {
+    const prefix = `tradeMind_${currentAccountId}_`;
+    
+    const savedTrades = localStorage.getItem(`${prefix}trades`);
+    if (savedTrades) {
+      try { setTrades(JSON.parse(savedTrades)); } catch (e) { setTrades([]); }
+    } else {
+      setTrades([]);
+    }
+
+    const savedTasks = localStorage.getItem(`${prefix}tasks`);
+    if (savedTasks) {
+       try { setTasks(JSON.parse(savedTasks)); } catch (e) { setTasks([]); }
+    } else {
+       setTasks([]);
+    }
+
+    const savedEvents = localStorage.getItem(`${prefix}events`);
+    if (savedEvents) {
+       try { setEvents(JSON.parse(savedEvents)); } catch (e) { setEvents([]); }
+    } else {
+       setEvents([]);
+    }
+
+    const savedNotes = localStorage.getItem(`${prefix}notes`);
+    if (savedNotes) {
+       try { setNotes(JSON.parse(savedNotes)); } catch (e) { setNotes([]); }
+    } else {
+       setNotes([]);
+    }
+
+    const savedCapital = localStorage.getItem(`${prefix}capital`);
+    if (savedCapital) {
+      setInitialCapital(parseFloat(savedCapital));
+    } else {
+      setInitialCapital(0);
+    }
+
+    const savedCurrency = localStorage.getItem(`${prefix}currency`);
+    if (savedCurrency) {
+      setCurrency(savedCurrency);
+    } else {
+      setCurrency('$');
+    }
+    
+    const savedLimit = localStorage.getItem(`${prefix}dailyLimit`);
+    if (savedLimit) {
+      setDailyTradeLimit(parseInt(savedLimit, 10));
+    } else {
+      setDailyTradeLimit(0);
+    }
+
+    const savedTheme = localStorage.getItem(`${prefix}theme`);
+    if (savedTheme) {
+      setThemeId(savedTheme);
+    } else {
+      setThemeId('slate');
+    }
+
+    localStorage.setItem('tradeMind_last_account_id', currentAccountId);
+  }, [currentAccountId]);
+
   // Save to local storage on change
   useEffect(() => {
-    localStorage.setItem('tradeMind_trades', JSON.stringify(trades));
-  }, [trades]);
+    localStorage.setItem(`tradeMind_${currentAccountId}_trades`, JSON.stringify(trades));
+  }, [trades, currentAccountId]);
 
   useEffect(() => {
-    localStorage.setItem('tradeMind_tasks', JSON.stringify(tasks));
-  }, [tasks]);
+    localStorage.setItem(`tradeMind_${currentAccountId}_tasks`, JSON.stringify(tasks));
+  }, [tasks, currentAccountId]);
 
   useEffect(() => {
-    localStorage.setItem('tradeMind_events', JSON.stringify(events));
-  }, [events]);
+    localStorage.setItem(`tradeMind_${currentAccountId}_events`, JSON.stringify(events));
+  }, [events, currentAccountId]);
 
   useEffect(() => {
-    localStorage.setItem('tradeMind_notes', JSON.stringify(notes));
-  }, [notes]);
+    localStorage.setItem(`tradeMind_${currentAccountId}_notes`, JSON.stringify(notes));
+  }, [notes, currentAccountId]);
 
   useEffect(() => {
-    localStorage.setItem('tradeMind_capital', initialCapital.toString());
-  }, [initialCapital]);
+    localStorage.setItem(`tradeMind_${currentAccountId}_capital`, initialCapital.toString());
+  }, [initialCapital, currentAccountId]);
 
   useEffect(() => {
-    localStorage.setItem('tradeMind_currency', currency);
-  }, [currency]);
+    localStorage.setItem(`tradeMind_${currentAccountId}_currency`, currency);
+  }, [currency, currentAccountId]);
   
   useEffect(() => {
-    localStorage.setItem('tradeMind_dailyLimit', dailyTradeLimit.toString());
-  }, [dailyTradeLimit]);
+    localStorage.setItem(`tradeMind_${currentAccountId}_dailyLimit`, dailyTradeLimit.toString());
+  }, [dailyTradeLimit, currentAccountId]);
 
   useEffect(() => {
-    localStorage.setItem('tradeMind_theme', themeId);
-  }, [themeId]);
+    localStorage.setItem(`tradeMind_${currentAccountId}_theme`, themeId);
+  }, [themeId, currentAccountId]);
 
   // --- REMINDER SYSTEM ---
   useEffect(() => {
@@ -251,6 +301,67 @@ const App: React.FC = () => {
       setInitialCapital(prev => prev - amt);
       setTransactionAmount('');
       setIsFundsModalOpen(false);
+    }
+  };
+
+  // Account Management Handlers
+  const handleCreateAccount = () => {
+    if (!newAccountName.trim()) return;
+    const newAccount: Account = {
+      id: crypto.randomUUID(),
+      name: newAccountName.trim(),
+      createdAt: new Date().toISOString()
+    };
+    const updatedAccounts = [...accounts, newAccount];
+    setAccounts(updatedAccounts);
+    localStorage.setItem('tradeMind_accounts_list', JSON.stringify(updatedAccounts));
+    setNewAccountName('');
+    setCurrentAccountId(newAccount.id);
+    setIsAccountModalOpen(false);
+    setNotification({ message: `Account "${newAccount.name}" created`, type: 'info' });
+  };
+
+  const handleResetAccount = () => {
+    const currentAccount = accounts.find(a => a.id === currentAccountId);
+    if (window.confirm(`Are you sure you want to RESET "${currentAccount?.name}"? All trades, notes, and settings for THIS account will be permanently deleted.`)) {
+      setTrades([]);
+      setTasks([]);
+      setEvents([]);
+      setNotes([]);
+      setInitialCapital(0);
+      setDailyTradeLimit(0);
+      setNotification({ message: 'Account reset successful', type: 'alert' });
+      setIsSettingsModalOpen(false);
+    }
+  };
+
+  const handleSwitchAccount = (id: string) => {
+    setCurrentAccountId(id);
+    setNotification({ message: 'Account switched', type: 'info' });
+  };
+
+  const handleDeleteAccount = (id: string) => {
+    if (accounts.length <= 1) {
+      alert("You cannot delete your only account.");
+      return;
+    }
+    const accountToDelete = accounts.find(a => a.id === id);
+    if (window.confirm(`Delete account "${accountToDelete?.name}"? All associated data will be lost forever.`)) {
+      // 1. Remove data from localStorage
+      const prefix = `tradeMind_${id}_`;
+      const keysToRemove = ['trades', 'tasks', 'events', 'notes', 'capital', 'currency', 'dailyLimit', 'theme'];
+      keysToRemove.forEach(k => localStorage.removeItem(prefix + k));
+
+      // 2. Update accounts list
+      const updatedAccounts = accounts.filter(a => a.id !== id);
+      setAccounts(updatedAccounts);
+      localStorage.setItem('tradeMind_accounts_list', JSON.stringify(updatedAccounts));
+
+      // 3. Switch to another account if the current one was deleted
+      if (currentAccountId === id) {
+        setCurrentAccountId(updatedAccounts[0].id);
+      }
+      setNotification({ message: 'Account deleted', type: 'alert' });
     }
   };
 
@@ -419,6 +530,15 @@ const App: React.FC = () => {
             <span className="hidden sm:inline">Diary</span>
           </button>
           <button
+            onClick={() => setActiveTab('gallery')}
+            className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
+              activeTab === 'gallery' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ImageIcon className="w-4 h-4" />
+            <span className="hidden sm:inline">Gallery</span>
+          </button>
+          <button
             onClick={() => setActiveTab('planner')}
             className={`px-3 sm:px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${
               activeTab === 'planner' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
@@ -439,6 +559,17 @@ const App: React.FC = () => {
         </nav>
 
         <div className="flex items-center gap-3">
+          {/* Account Switcher Widget */}
+          <button 
+             onClick={() => setIsAccountModalOpen(true)}
+             className="hidden sm:flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-700 transition-colors"
+          >
+            <Users className="w-4 h-4 text-blue-400" />
+            <span className="text-sm font-medium text-slate-200">
+              {accounts.find(a => a.id === currentAccountId)?.name || 'Account'}
+            </span>
+          </button>
+
           {/* Limit Reached Indicator */}
           {dailyTradeLimit > 0 && todayTradeCount >= dailyTradeLimit && (
             <div className="hidden md:flex items-center gap-1 bg-red-500/10 border border-red-500/50 text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold animate-pulse">
@@ -605,6 +736,16 @@ const App: React.FC = () => {
             </div>
           </div>
         )}
+
+        {activeTab === 'gallery' && (
+           <div className="animate-in fade-in duration-500">
+              <div className="mb-6">
+                <h2 className={`text-2xl font-bold mb-2 ${currentTheme.textMain}`}>Chart Evidence Gallery</h2>
+                <p className={currentTheme.textMuted}>A visual collection of your trading setups and executions.</p>
+              </div>
+              <ScreenshotGallery trades={trades} />
+           </div>
+        )}
       </main>
 
       {/* Notification Toast */}
@@ -629,6 +770,80 @@ const App: React.FC = () => {
           dailyTradeCount={todayTradeCount}
           dailyTradeLimit={dailyTradeLimit}
         />
+      )}
+
+      {/* Account Management Modal */}
+      {isAccountModalOpen && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+             <div className="bg-slate-900 rounded-2xl w-full max-w-md border border-slate-700 shadow-2xl p-6">
+                 <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                        <Users className="w-5 h-5 text-blue-500" /> My Accounts
+                    </h3>
+                    <button onClick={() => setIsAccountModalOpen(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+                 </div>
+                 
+                 <div className="space-y-4 mb-8">
+                    {accounts.map(account => (
+                        <div 
+                          key={account.id} 
+                          className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                            currentAccountId === account.id 
+                            ? 'bg-blue-600/10 border-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.1)]' 
+                            : 'bg-slate-800 border-slate-700 hover:border-slate-600 cursor-pointer'
+                          }`}
+                          onClick={() => handleSwitchAccount(account.id)}
+                        >
+                           <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-lg ${currentAccountId === account.id ? 'bg-blue-500 text-white' : 'bg-slate-700 text-slate-400'}`}>
+                                 <Users className="w-4 h-4" />
+                              </div>
+                              <div>
+                                 <p className="text-sm font-bold text-white">{account.name}</p>
+                                 <p className="text-[10px] text-slate-500">Created {new Date(account.createdAt).toLocaleDateString()}</p>
+                              </div>
+                           </div>
+                           {currentAccountId === account.id ? (
+                             <div className="text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded font-bold uppercase tracking-wider">Active</div>
+                           ) : (
+                             <button 
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 handleDeleteAccount(account.id);
+                               }}
+                               className="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
+                               title="Delete Account"
+                             >
+                                <X className="w-4 h-4" />
+                             </button>
+                           )}
+                        </div>
+                    ))}
+                 </div>
+
+                 <div className="pt-6 border-t border-slate-800">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+                       <UserPlus className="w-3 h-3" /> Create New Account
+                    </h4>
+                    <div className="flex gap-2">
+                        <input 
+                            type="text" 
+                            value={newAccountName}
+                            onChange={(e) => setNewAccountName(e.target.value)}
+                            placeholder="Account name (e.g. Crypto, Forex)"
+                            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white focus:border-blue-500 outline-none"
+                            onKeyDown={(e) => e.key === 'Enter' && handleCreateAccount()}
+                        />
+                        <button 
+                          onClick={handleCreateAccount}
+                          className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-lg shadow-blue-500/20"
+                        >
+                          Create
+                        </button>
+                    </div>
+                 </div>
+             </div>
+          </div>
       )}
 
       {/* Funds Modal */}
@@ -756,6 +971,21 @@ const App: React.FC = () => {
                         <h4 className="text-sm font-bold text-slate-400 uppercase border-b border-slate-700 pb-2">Data Management</h4>
                         
                         <div className="grid grid-cols-1 gap-3">
+                            <button 
+                                onClick={handleResetAccount}
+                                className="flex items-center justify-between p-3 bg-red-900/10 border border-red-500/20 rounded-lg hover:bg-red-900/20 transition-colors group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-red-500/10 rounded-lg text-red-400 group-hover:bg-red-500 group-hover:text-white transition-colors">
+                                        <RotateCcw className="w-5 h-5" />
+                                    </div>
+                                    <div className="text-left">
+                                        <div className="text-sm font-medium text-red-400">Reset Account</div>
+                                        <div className="text-xs text-red-400/60">Permanently delete all data for THIS account.</div>
+                                    </div>
+                                </div>
+                            </button>
+
                             <button 
                                 onClick={handleBackup}
                                 className="flex items-center justify-between p-3 bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 transition-colors group"
