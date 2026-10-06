@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Trade, TradeType, Outcome } from '../types';
-import { Calendar, Tag, Target, ShieldAlert, Scale, Filter, AlertTriangle, Edit2, Trash2, CheckCircle2, Star, AlertCircle, ChevronDown, ChevronUp, BookOpen, XCircle } from 'lucide-react';
+import { Calendar, Tag, Target, ShieldAlert, Scale, Filter, AlertTriangle, Edit2, Trash2, CheckCircle2, Star, AlertCircle, ChevronDown, ChevronUp, BookOpen, XCircle, Image as ImageIcon } from 'lucide-react';
 
 interface TradeListProps {
   trades: Trade[];
@@ -212,6 +212,12 @@ const TradeCard: React.FC<TradeCardProps> = ({ trade, initialCapital, currency, 
                           <span className="font-medium text-slate-400">{trade.setup}</span>
                       </div>
                   )}
+                  {trade.screenshotUrl && (
+                      <div className="text-xs text-blue-400/80 flex items-center gap-1 bg-blue-900/20 px-2 py-1 rounded border border-blue-900/30">
+                          <ImageIcon className="w-3 h-3" />
+                          <span className="font-medium">Screenshot Attached</span>
+                      </div>
+                  )}
               </div>
               <button 
                   onClick={() => setIsExpanded(!isExpanded)}
@@ -278,6 +284,32 @@ const TradeCard: React.FC<TradeCardProps> = ({ trade, initialCapital, currency, 
                             </div>
                         )}
                     </div>
+
+                    {/* Screenshot Display */}
+                    {trade.screenshotUrl && (
+                        <div className="mt-4">
+                            <h5 className="text-[10px] uppercase font-bold text-slate-500 mb-2 flex items-center gap-1">
+                                <ImageIcon className="w-3 h-3" /> Chart Evidence
+                            </h5>
+                            <div className="rounded-xl overflow-hidden border border-slate-700 bg-slate-800 group/img relative">
+                                <img 
+                                    src={trade.screenshotUrl} 
+                                    alt="Trade chart evidence" 
+                                    className="w-full h-auto max-h-[500px] object-contain"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                                    <a 
+                                        href={trade.screenshotUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-full text-white text-xs font-bold border border-white/20 hover:bg-white/20 transition-all"
+                                    >
+                                        Open Full Image
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
           </div>

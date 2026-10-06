@@ -46,6 +46,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
   const [learnings, setLearnings] = useState('');
   const [mistakes, setMistakes] = useState('');
   const [executionRating, setExecutionRating] = useState<number>(0);
+  const [screenshotUrl, setScreenshotUrl] = useState<string | undefined>(undefined);
 
   // Load Data on Edit
   useEffect(() => {
@@ -72,6 +73,7 @@ export const TradeForm: React.FC<TradeFormProps> = ({
       setLearnings(initialData.learnings || '');
       setMistakes(initialData.mistakes || '');
       setExecutionRating(initialData.executionRating || 0);
+      setScreenshotUrl(initialData.screenshotUrl);
     }
   }, [initialData]);
 
@@ -159,7 +161,8 @@ export const TradeForm: React.FC<TradeFormProps> = ({
       emotionsExit,
       learnings,
       mistakes,
-      executionRating
+      executionRating,
+      screenshotUrl
     };
 
     onSave(tradeData);
@@ -193,6 +196,17 @@ export const TradeForm: React.FC<TradeFormProps> = ({
   );
 
   const isLimitExceeded = !initialData && dailyTradeLimit > 0 && dailyTradeCount >= dailyTradeLimit;
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setScreenshotUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
@@ -383,6 +397,43 @@ export const TradeForm: React.FC<TradeFormProps> = ({
             <div>
                <label className="block text-xs font-medium text-slate-400 mb-1">General Notes</label>
                <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} className="w-full bg-slate-800 border border-slate-700 rounded p-2 text-white focus:border-blue-500 outline-none resize-none" />
+            </div>
+
+            <div>
+               <label className="block text-xs font-medium text-slate-400 mb-2">Trade Screenshot</label>
+               <div className="flex items-start gap-4">
+                  <div className="flex-1">
+                     <div 
+                        onClick={() => document.getElementById('screenshot-upload')?.click()}
+                        className="border-2 border-dashed border-slate-700 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 transition-all group"
+                     >
+                        <PlusCircle className="w-8 h-8 text-slate-500 group-hover:text-blue-500 mb-2" />
+                        <span className="text-sm text-slate-400 group-hover:text-slate-300">
+                           {screenshotUrl ? 'Change Screenshot' : 'Upload Screenshot (PNG, JPG)'}
+                        </span>
+                        <input 
+                           id="screenshot-upload" 
+                           type="file" 
+                           accept="image/*" 
+                           onChange={handleImageUpload} 
+                           className="hidden" 
+                        />
+                     </div>
+                  </div>
+                  {screenshotUrl && (
+                     <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-slate-700">
+                        <img src={screenshotUrl} alt="Trade Screenshot" className="w-full h-full object-cover" />
+                        <button 
+                           type="button" 
+                           onClick={() => setScreenshotUrl(undefined)}
+                           className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                        >
+                           <X className="w-3 h-3" />
+                        </button>
+                     </div>
+                  )}
+               </div>
+               <p className="text-[10px] text-slate-500 mt-2 italic">Capture your entry chart or exit confluence for future study.</p>
             </div>
           </section>
 
